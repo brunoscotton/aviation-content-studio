@@ -66,7 +66,7 @@ Para Playwright, se o navegador ainda não estiver instalado: `npx playwright in
 3. Execute lint, typecheck, testes e build; configure a URL de redirect de autenticação no Supabase.
 4. Faça o deploy pelo fluxo do seu projeto. Este repositório não cria recursos pagos nem executa deploy.
 
-Se a API disser que `OPENAI_API_KEY` não foi configurada mesmo depois de cadastrá-la na Vercel, confirme o nome exato `OPENAI_API_KEY`, o ambiente `Production` (para o domínio principal) e faça um novo deploy após salvar. A chave não deve começar com `NEXT_PUBLIC_`.
+Se o cartão do dashboard indicar que `OPENAI_API_KEY` não chegou ao servidor, confirme o nome exato da variável, o ambiente `Production` (para o domínio principal) e faça um novo deploy após salvar. Se indicar `Presente` e uma chamada falhar, a resposta agora diferencia chave rejeitada (401), falta de permissão/modelo (403/404) e limite ou créditos (429). A chave não deve começar com `NEXT_PUBLIC_`.
 
 ## Limitações conhecidas
 

@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import { ResearchRequestSchema } from "@/lib/domain";
 import { authorizeRequest } from "@/lib/server/auth";
-import { getOpenAIApiKey, openAIConfigurationError } from "@/lib/server/openai";
+import { getOpenAIApiKey, openAIConfigurationError, openAIRequestError } from "@/lib/server/openai";
 import { checkUsage, isDuplicate } from "@/lib/server/usage";
 
 const allowedDomains = ["gov.br", "anac.gov.br", "decea.mil.br", "faa.gov", "easa.europa.eu", "boeing.com", "airbus.com", "embraer.com"];
@@ -50,8 +50,8 @@ export async function POST(request: Request) {
     const gaps = block("LACUNAS").split(/\n+/).map((v) => v.replace(/^[-*•\d.)\s]+/, "").trim()).filter(Boolean);
     return NextResponse.json({ summary, sources, verifiedPoints, divergences, gaps, accessedAt: new Date().toISOString() });
   } catch (error) {
-    console.error("research_request_failed", error instanceof Error ? error.message : "unknown");
+    console.error("research_request_failed", error instanceof Error ? error.name : "unknown");
     const timeout = error instanceof Error && error.name === "TimeoutError";
-    return NextResponse.json({ error: timeout ? "A pesquisa excedeu o tempo limite. Tente novamente." : "A pesquisa falhou. Verifique a configuração e tente novamente." }, { status: timeout ? 504 : 502 });
+    return NextResponse.json({ error: timeout ? "A pesquisa excedeu o tempo limite. Tente novamente." : openAIRequestError("Pesquisa", error) }, { status: timeout ? 504 : 502 });
   }
 }

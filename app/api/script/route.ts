@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { ScriptSchema } from "@/lib/domain";
 import { authorizeRequest } from "@/lib/server/auth";
-import { getOpenAIApiKey, openAIConfigurationError } from "@/lib/server/openai";
+import { getOpenAIApiKey, openAIConfigurationError, openAIRequestError } from "@/lib/server/openai";
 import { checkUsage, isDuplicate } from "@/lib/server/usage";
 import { createClient } from "@/lib/supabase/server";
 
@@ -52,8 +52,8 @@ export async function POST(request: Request) {
     if (script.sourceUrls.some((url) => !allowed.has(url))) return NextResponse.json({ error: "O roteiro retornou uma fonte que não pertence à pesquisa aprovada. Tente novamente." }, { status: 502 });
     return NextResponse.json({ script });
   } catch (error) {
-    console.error("script_request_failed", error instanceof Error ? error.message : "unknown");
+    console.error("script_request_failed", error instanceof Error ? error.name : "unknown");
     const timeout = error instanceof Error && error.name === "TimeoutError";
-    return NextResponse.json({ error: timeout ? "A geração excedeu o tempo limite." : "A resposta não passou pela validação do roteiro. Tente novamente." }, { status: timeout ? 504 : 502 });
+    return NextResponse.json({ error: timeout ? "A geração excedeu o tempo limite." : openAIRequestError("Geração", error) }, { status: timeout ? 504 : 502 });
   }
 }
