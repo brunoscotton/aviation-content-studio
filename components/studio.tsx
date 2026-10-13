@@ -179,7 +179,51 @@ function Library({ projects, query, badge, onSelect, onNew }: { projects: Projec
 }
 function DiscoveryIntro({ onStart, onNew }: { onStart: () => void; onNew: () => void }) { return <div className="page-content discovery-landing"><div className="discovery-hero"><div className="hero-orbit"><div className="orbit-ring"/><div className="orbit-plane"><Plane size={29}/></div><span className="orbit-star star-one">✦</span><span className="orbit-star star-two">✧</span><span className="orbit-star star-three">✦</span></div><div className="eyebrow">RESEARCH DESK</div><h1>Do céu aberto<br/>à sua próxima pauta.</h1><p>Pesquise fontes atuais, encontre ângulos para o seu público e decida o que merece virar conteúdo.</p><div className="hero-buttons"><button className="button primary" onClick={onStart}><Sparkles size={16}/> Pesquisar uma pauta</button><button className="button secondary" onClick={onNew}><Plus size={16}/> Adicionar uma ideia</button></div><div className="hero-trust"><ShieldCheck size={14}/> Pesquisa rastreável <span>·</span> Aprovação editorial</div></div><div className="source-strip"><div><b>FONTES PRIORITÁRIAS</b><span>ANAC</span><span>DECEA</span><span>FAA</span><span>EASA</span><span>Fabricantes</span></div><p>Fontes serão exibidas com links, data de consulta e evidências.</p></div></div>; }
 
-function Preferences({ onSave }: { onSave: (key: string, value: string) => void }) { const [tone, setTone] = useState("Curioso e didático"); const [audience, setAudience] = useState("Público geral interessado em aviação"); const [length, setLength] = useState("45–60 segundos"); useEffect(() => { const timer = setTimeout(() => { try { const saved = localStorage.getItem("aviation-pref-editorial"); if (saved) { const pref = JSON.parse(saved) as { tone?: string; audience?: string; length?: string }; if (pref.tone) setTone(pref.tone); if (pref.audience) setAudience(pref.audience); if (pref.length) setLength(pref.length); } } catch { /* Ignore malformed local preferences. */ } }, 0); return () => clearTimeout(timer); }, []); return <div className="page-content"><div className="section-heading"><div><div className="eyebrow">CONFIGURAÇÃO DO WORKSPACE</div><h1>Preferências editoriais</h1><p className="page-subtitle">Defina padrões para pautas e roteiros.</p></div></div><div className="settings-layout"><div className="settings-nav"><div className="settings-nav-item active"><PencilLine size={16}/> Diretrizes editoriais</div></div><section className="panel settings-panel"><div className="settings-title"><div><h2>Voz e público</h2><p>Estes padrões orientam suas próximas pautas e roteiros.</p></div><div className="settings-symbol"><PencilLine size={17}/></div></div><div className="field"><label htmlFor="tone">Tom de voz</label><select id="tone" value={tone} onChange={(e) => setTone(e.target.value)}><option>Curioso e didático</option><option>Jornalístico e objetivo</option><option>Leve e bem-humorado</option><option>Técnico e detalhado</option></select><small>Natural em português brasileiro, sem jargão desnecessário.</small></div><div className="field"><label htmlFor="pref-audience">Público principal</label><input id="pref-audience" value={audience} onChange={(e) => setAudience(e.target.value)}/></div><div className="field"><label htmlFor="length">Duração padrão de Reels</label><select id="length" value={length} onChange={(e) => setLength(e.target.value)}><option>30–45 segundos</option><option>45–60 segundos</option><option>60–90 segundos</option></select></div><div className="settings-check"><div><b>Rigor técnico</b><p>Exigir fonte para alegações técnicas e diferenciar fatos de exemplos.</p></div><span className="fixed-setting">Sempre ativo</span></div><div className="settings-check"><div><b>Aprovação humana</b><p>Manter revisão obrigatória antes de aprovar roteiro.</p></div><span className="fixed-setting">Sempre ativa</span></div><div className="settings-footer"><span>Preferências editoriais salvas neste dispositivo.</span><button className="button primary" onClick={() => { onSave("editorial", JSON.stringify({ tone, audience, length })); }}>Salvar preferências</button></div></section></div></div>; }
+function Preferences({ onSave }: { onSave: (key: string, value: string) => void }) {
+  const [tone, setTone] = useState("Curioso e didático");
+  const [audience, setAudience] = useState("Público geral interessado em aviação");
+  const [length, setLength] = useState("45–60 segundos");
+  const [fontScale, setFontScale] = useState(1.15);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const saved = localStorage.getItem("aviation-pref-editorial");
+        if (saved) {
+          const pref = JSON.parse(saved) as { tone?: string; audience?: string; length?: string };
+          if (pref.tone) setTone(pref.tone);
+          if (pref.audience) setAudience(pref.audience);
+          if (pref.length) setLength(pref.length);
+        }
+        const savedScale = Number(localStorage.getItem("aviation-pref-font-size"));
+        if (Number.isFinite(savedScale) && savedScale >= 1 && savedScale <= 1.5) setFontScale(savedScale);
+      } catch { /* Ignore malformed local preferences. */ }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
+
+  function changeFontScale(value: number) {
+    setFontScale(value);
+    document.documentElement.style.setProperty("--font-scale", String(value));
+    localStorage.setItem("aviation-pref-font-size", String(value));
+  }
+
+  return <div className="page-content">
+    <div className="section-heading"><div><div className="eyebrow">CONFIGURAÇÃO DO WORKSPACE</div><h1>Preferências editoriais</h1><p className="page-subtitle">Defina padrões para pautas, roteiros e leitura.</p></div></div>
+    <div className="settings-layout"><div className="settings-nav"><div className="settings-nav-item active"><PencilLine size={16}/> Diretrizes editoriais</div></div>
+      <section className="panel settings-panel">
+        <div className="settings-title"><div><h2>Voz e público</h2><p>Estes padrões orientam suas próximas pautas e roteiros.</p></div><div className="settings-symbol"><PencilLine size={17}/></div></div>
+        <div className="field"><label htmlFor="tone">Tom de voz</label><select id="tone" value={tone} onChange={(e) => setTone(e.target.value)}><option>Curioso e didático</option><option>Jornalístico e objetivo</option><option>Leve e bem-humorado</option><option>Técnico e detalhado</option></select><small>Natural em português brasileiro, sem jargão desnecessário.</small></div>
+        <div className="field"><label htmlFor="pref-audience">Público principal</label><input id="pref-audience" value={audience} onChange={(e) => setAudience(e.target.value)}/></div>
+        <div className="field"><label htmlFor="length">Duração padrão de Reels</label><select id="length" value={length} onChange={(e) => setLength(e.target.value)}><option>30–45 segundos</option><option>45–60 segundos</option><option>60–90 segundos</option></select></div>
+        <div className="field font-scale-field"><label htmlFor="font-size">Tamanho das letras</label><div className="font-scale-control"><span>Menor</span><input id="font-size" type="range" min="1" max="1.5" step="0.05" value={fontScale} onChange={(e) => changeFontScale(Number(e.target.value))} aria-describedby="font-size-help"/><span>Maior</span><output htmlFor="font-size">{Math.round(fontScale * 100)}%</output></div><small id="font-size-help">A mudança é aplicada na hora e salva neste dispositivo.</small><p className="font-scale-preview" aria-live="polite">Exemplo de leitura com este tamanho.</p></div>
+        <div className="settings-check"><div><b>Rigor técnico</b><p>Exigir fonte para alegações técnicas e diferenciar fatos de exemplos.</p></div><span className="fixed-setting">Sempre ativo</span></div>
+        <div className="settings-check"><div><b>Aprovação humana</b><p>Manter revisão obrigatória antes de aprovar roteiro.</p></div><span className="fixed-setting">Sempre ativa</span></div>
+        <div className="settings-footer"><span>Preferências editoriais salvas neste dispositivo.</span><button className="button primary" onClick={() => { onSave("editorial", JSON.stringify({ tone, audience, length })); onSave("font-size", String(fontScale)); }}>Salvar preferências</button></div>
+      </section>
+    </div>
+  </div>;
+}
 
 function Modal({ title, eyebrow, onClose, children }: { title: string; eyebrow: string; onClose: () => void; children: React.ReactNode }) { return <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><section className="modal" role="dialog" aria-modal="true" aria-label={title}><div className="modal-header"><div><div className="eyebrow">{eyebrow}</div><h2>{title}</h2></div><button className="icon-button" onClick={onClose} aria-label="Fechar"><X size={18}/></button></div>{children}</section></div>; }
 

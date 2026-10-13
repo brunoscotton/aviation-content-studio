@@ -61,10 +61,12 @@ Para Playwright, se o navegador ainda não estiver instalado: `npx playwright in
 
 ## Deploy Vercel
 
-1. Configure as variáveis privadas no painel Vercel (`OPENAI_API_KEY`) e as públicas do Supabase (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`).
+1. Configure no painel Vercel as variáveis públicas do Supabase (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`) e as variáveis privadas `OPENAI_API_KEY` e `OPENAI_MODEL`. Marque `Production` para o domínio principal. Depois de editar variáveis, faça um novo deploy: elas não alteram implantações já criadas.
 2. Aplique a migration ao banco Supabase por um processo revisado e autorizado. O app não executa migrations remotas automaticamente.
 3. Execute lint, typecheck, testes e build; configure a URL de redirect de autenticação no Supabase.
 4. Faça o deploy pelo fluxo do seu projeto. Este repositório não cria recursos pagos nem executa deploy.
+
+Se a API disser que `OPENAI_API_KEY` não foi configurada mesmo depois de cadastrá-la na Vercel, confirme o nome exato `OPENAI_API_KEY`, o ambiente `Production` (para o domínio principal) e faça um novo deploy após salvar. A chave não deve começar com `NEXT_PUBLIC_`.
 
 ## Limitações conhecidas
 

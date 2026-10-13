@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import { ResearchRequestSchema } from "@/lib/domain";
 import { authorizeRequest } from "@/lib/server/auth";
+import { getOpenAIApiKey, openAIConfigurationError } from "@/lib/server/openai";
 import { checkUsage, isDuplicate } from "@/lib/server/usage";
 
 const allowedDomains = ["gov.br", "anac.gov.br", "decea.mil.br", "faa.gov", "easa.europa.eu", "boeing.com", "airbus.com", "embraer.com"];
@@ -10,7 +11,8 @@ export async function POST(request: Request) {
   const auth = await authorizeRequest();
   if (!auth.ok) return NextResponse.json({ error: "Faça login para pesquisar pautas." }, { status: 401 });
   if (auth.userId === "local-demo") return NextResponse.json({ error: "Pesquisa real exige Supabase Auth para restringir o uso ao workspace privado. Sem essa configuração, o modo demo não executa pesquisas." }, { status: 503 });
-  if (!process.env.OPENAI_API_KEY) return NextResponse.json({ error: "Pesquisa real indisponível: configure OPENAI_API_KEY no ambiente do servidor. Nenhum resultado fictício foi criado." }, { status: 503 });
+  const apiKey = getOpenAIApiKey();
+  if (!apiKey) return NextResponse.json({ error: openAIConfigurationError("pesquisa") }, { status: 503 });
   let raw: unknown;
   try { raw = await request.json(); } catch { return NextResponse.json({ error: "Corpo JSON inválido." }, { status: 400 }); }
   const parsed = ResearchRequestSchema.safeParse(raw);
@@ -19,7 +21,7 @@ export async function POST(request: Request) {
   if (idempotencyKey && isDuplicate(auth.userId, idempotencyKey)) return NextResponse.json({ error: "Esta solicitação já foi recebida. Aguarde antes de tentar de novo." }, { status: 409 });
   if (!checkUsage(auth.userId, "research")) return NextResponse.json({ error: "Limite local de pesquisas atingido (10 por usuário a cada 24h)." }, { status: 429 });
   try {
-    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 45_000, maxRetries: 1 });
+    const client = new OpenAI({ apiKey, timeout: 45_000, maxRetries: 1 });
     const { topic, category, audience, format, period } = parsed.data;
     const response = await client.responses.create({
       model: process.env.OPENAI_MODEL || "gpt-6-astra",
