@@ -35,7 +35,7 @@ export function providerRequestError(feature: "Pesquisa" | "Geração", error: u
         : `${feature}: o Tavily recusou TAVILY_API_KEY (HTTP ${error.status}). Confira a chave no painel Tavily.`;
     }
     if (error.status === 404 && error.provider === "Gemini") {
-      return `${feature}: o modelo Gemini configurado não foi encontrado. Confira GEMINI_MODEL na Vercel; o padrão é gemini-2.5-flash.`;
+      return `${feature}: o modelo Gemini não está disponível para esta chave/projeto. Configure GEMINI_MODEL como gemini-3.8-flash na Vercel e publique um novo deploy.`;
     }
     if (error.status === 429) {
       return error.provider === "Gemini"
@@ -60,23 +60,34 @@ export async function generateWithGemini(
   const apiKey = getGeminiApiKey();
   if (!apiKey) throw new Error("GEMINI_API_KEY is not configured");
 
-  const model = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-    body: JSON.stringify({
-      system_instruction: options.systemInstruction ? { parts: [{ text: options.systemInstruction }] } : undefined,
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: options.json ? { responseMimeType: "application/json" } : undefined,
-    }),
-    signal: options.signal ?? AbortSignal.timeout(50_000),
-  });
+  const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.8-flash";
+  const modelsToTry = model === "gemini-2.5-flash" ? [model, "gemini-3.8-flash"] : [model];
 
-  const data = await response.json() as GeminiResponse;
-  if (!response.ok) throw new ProviderApiError("Gemini", response.status, data.error?.status);
-  const text = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim();
-  if (!text) throw new Error("Gemini returned no text");
-  return text;
+  for (let attempt = 0; attempt < modelsToTry.length; attempt += 1) {
+    const selectedModel = modelsToTry[attempt];
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(selectedModel)}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify({
+        system_instruction: options.systemInstruction ? { parts: [{ text: options.systemInstruction }] } : undefined,
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: options.json ? { responseMimeType: "application/json" } : undefined,
+      }),
+      signal: options.signal ?? AbortSignal.timeout(50_000),
+    });
+
+    const data = await response.json() as GeminiResponse;
+    if (!response.ok) {
+      const error = new ProviderApiError("Gemini", response.status, data.error?.status);
+      if (attempt < modelsToTry.length - 1 && response.status === 404) continue;
+      throw error;
+    }
+    const text = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim();
+    if (!text) throw new Error("Gemini returned no text");
+    return text;
+  }
+
+  throw new Error("Gemini returned no available model");
 }
 
 export async function searchWithTavily(query: string, signal?: AbortSignal) {

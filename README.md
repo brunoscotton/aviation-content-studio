@@ -41,7 +41,7 @@ Nunca configure `service_role` no navegador ou neste MVP. O cliente Supabase usa
 
 ## Gemini e pesquisa web
 
-Defina `GEMINI_API_KEY` e `TAVILY_API_KEY` no ambiente servidor. `GEMINI_MODEL` é opcional e usa `gemini-2.5-flash` por padrão. A busca web usa Tavily Basic (cota gratuita anunciada de 1.000 créditos/mês, sem cartão); uma pesquisa básica consome crédito conforme o plano Tavily. O Gemini analisa somente os trechos e URLs retornados pela busca, que são tratados como dados não confiáveis. Fontes aparecem como links e seguem para a revisão humana. O código não publica em redes.
+Defina `GEMINI_API_KEY` e `TAVILY_API_KEY` no ambiente servidor. `GEMINI_MODEL` é opcional e usa `gemini-3.8-flash` por padrão. A busca web usa Tavily Basic (cota gratuita anunciada de 1.000 créditos/mês, sem cartão); uma pesquisa básica consome crédito conforme o plano Tavily. O Gemini analisa somente os trechos e URLs retornados pela busca, que são tratados como dados não confiáveis. Fontes aparecem como links e seguem para a revisão humana. O código não publica em redes.
 
 O limite de chamadas e a idempotência atuais são mantidos em memória do processo: são proteções básicas para desenvolvimento, não cotas duráveis entre réplicas/restarts. Adote armazenamento de uso/idempotência no banco antes de operar em escala. Custos dependem de modelo, tokens e chamadas de busca.
 
@@ -61,7 +61,7 @@ Para Playwright, se o navegador ainda não estiver instalado: `npx playwright in
 
 ## Deploy Vercel
 
-1. Configure no painel Vercel as variáveis públicas do Supabase (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`) e as variáveis privadas `GEMINI_API_KEY`, `GEMINI_MODEL` (`gemini-2.5-flash`) e `TAVILY_API_KEY`. Marque `Production` e, se aplicável, `Preview`/`Development`. Não use o prefixo `NEXT_PUBLIC_` nas chaves de IA.
+1. Configure no painel Vercel as variáveis públicas do Supabase (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`) e as variáveis privadas `GEMINI_API_KEY`, `GEMINI_MODEL` (`gemini-3.8-flash`) e `TAVILY_API_KEY`. Marque `Production` e, se aplicável, `Preview`/`Development`. Não use o prefixo `NEXT_PUBLIC_` nas chaves de IA.
 2. Aplique a migration `supabase/migrations/202610120001_initial_schema.sql` no projeto Supabase pelo SQL Editor. O app não executa migrations remotas automaticamente.
 3. Em Supabase Authentication, crie o usuário. Em Authentication > URL Configuration, configure o domínio Vercel como Site URL e inclua a URL de callback indicada no fluxo de autenticação em Redirect URLs.
 4. Depois de salvar variáveis no painel Vercel, publique um novo deploy. Variáveis novas não alteram implantações já criadas.
