@@ -46,6 +46,18 @@ export type Project = {
   divergences: string[]; gaps: string[]; sources: Source[]; versions: Version[]; events: { label: string; at: string }[];
 };
 
+export function approveProjectVersion(project: Project, versionId: string, at: string) {
+  if (project.status !== "script_review") throw new Error("Somente um roteiro em revisão pode ser aprovado.");
+  if (!project.versions.some((version) => version.id === versionId)) throw new Error("Versão não encontrada.");
+  return {
+    ...project,
+    status: transitionStatus(project.status, "approved"),
+    versions: project.versions.map((version) => version.id === versionId ? { ...version, approved: true } : version),
+    updatedAt: at,
+    events: [{ label: "Roteiro aprovado pelo editor", at }, ...project.events],
+  };
+}
+
 export const demoProjects: Project[] = [
   {
     id: "demo-1", title: "Por que os aviões deixam rastros no céu?", category: "Ciência & aviação", format: "Reels", audience: "Curiosos por aviação",
@@ -64,4 +76,13 @@ export const demoProjects: Project[] = [
     versions: [{ id: "v1", createdAt: "10 out · 15:12", note: "Rascunho de demonstração", approved: false, content: { hook: "Você sabia que um avião pode encontrar turbulência mesmo com o céu limpo?", development: [{ title: "O que é", text: "Este texto é apenas um exemplo fictício. Substitua por conteúdo apoiado em fontes verificadas antes de qualquer publicação.", scene: "Animação ilustrativa, identificar como exemplo." }], analogies: ["Analogia de demonstração — valide antes de usar."], examples: ["Exemplo fictício, requer apuração."], ending: "Consulte fontes oficiais e aprove o roteiro antes de publicar.", estimatedSeconds: 45, sourceUrls: [] } }], events: [{ label: "Versão de demonstração criada", at: "10 out · 15:12" }],
   },
 ];
+
+export const ProjectSchema = z.object({
+  id: z.string().min(1).max(80), title: z.string().trim().min(1).max(180), category: z.string().max(80), audience: z.string().max(100),
+  format: z.enum(["Reels", "Carrossel"]), status: WorkflowSchema, updatedAt: z.string().max(80),
+  researchSummary: z.string().max(20_000), verifiedPoints: z.array(z.string().max(1000)).max(100), divergences: z.array(z.string().max(1000)).max(100), gaps: z.array(z.string().max(1000)).max(100),
+  sources: z.array(z.object({ title: z.string().max(500), url: z.string().url(), accessedAt: z.string(), evidence: z.string().max(1000) })).max(100),
+  versions: z.array(z.object({ id: z.string().max(80), createdAt: z.string().max(80), content: ScriptSchema, note: z.string().max(1000), approved: z.boolean() })).max(100),
+  events: z.array(z.object({ label: z.string().max(2000), at: z.string().max(80) })).max(500),
+});
 
