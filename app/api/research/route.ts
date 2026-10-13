@@ -36,6 +36,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("research_request_failed", error instanceof Error ? error.name : "unknown");
     const timeout = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
-    return NextResponse.json({ error: providerRequestError("Pesquisa", error) }, { status: timeout ? 504 : error instanceof ProviderApiError && error.status === 429 ? 429 : 502 });
+    const providerStatus = error instanceof ProviderApiError && error.status >= 400 && error.status < 500 ? error.status : null;
+    return NextResponse.json({ error: providerRequestError("Pesquisa", error) }, { status: timeout ? 504 : providerStatus ?? 502 });
   }
 }

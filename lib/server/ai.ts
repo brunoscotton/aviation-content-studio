@@ -5,11 +5,14 @@ type GeminiResponse = {
 
 type TavilyResponse = {
   results?: Array<{ title?: string; url?: string; content?: string }>;
+  error?: string;
+  message?: string;
+  detail?: string;
 };
 
 export class ProviderApiError extends Error {
-  constructor(readonly provider: "Gemini" | "Tavily", readonly status: number, readonly code?: string) {
-    super(`${provider} API request failed (${status})`);
+  constructor(readonly provider: "Gemini" | "Tavily", readonly status: number, readonly code?: string, readonly detail?: string) {
+    super(`${provider} API request failed (${status})${code ? ` ${code}` : ""}`);
     this.name = "ProviderApiError";
   }
 }
@@ -30,9 +33,13 @@ export function aiConfigurationError(feature: "pesquisa" | "geração", missing:
 export function providerRequestError(feature: "Pesquisa" | "Geração", error: unknown) {
   if (error instanceof ProviderApiError) {
     if (error.status === 401 || error.status === 403) {
-      return error.provider === "Gemini"
-        ? `${feature}: o Google Gemini recusou GEMINI_API_KEY (HTTP ${error.status}). Confirme se a chave foi criada no Google AI Studio e se a Gemini API está habilitada para o projeto.`
-        : `${feature}: o Tavily recusou TAVILY_API_KEY (HTTP ${error.status}). Confira a chave no painel Tavily.`;
+      const provider = error.provider === "Gemini" ? "Google Gemini" : "Tavily";
+      const keyName = error.provider === "Gemini" ? "GEMINI_API_KEY" : "TAVILY_API_KEY";
+      const cause = error.detail ? ` Detalhe informado pelo serviço: ${error.detail}` : "";
+      const guidance = error.provider === "Gemini"
+        ? "Confira no Google AI Studio se a chave está ativa, se o projeto tem acesso à Gemini API e se a chave não tem restrição incompatível."
+        : "Confira se a chave está ativa e se o projeto Tavily permite o endpoint de pesquisa.";
+      return `${feature}: ${provider} recusou ${keyName} (HTTP ${error.status}${error.code ? `, ${error.code}` : ""}).${cause} ${guidance}`;
     }
     if (error.status === 404 && error.provider === "Gemini") {
       return `${feature}: o modelo Gemini não está disponível para esta chave/projeto. Configure GEMINI_MODEL como gemini-3.8-flash na Vercel e publique um novo deploy.`;
@@ -78,7 +85,8 @@ export async function generateWithGemini(
 
     const data = await response.json() as GeminiResponse;
     if (!response.ok) {
-      const error = new ProviderApiError("Gemini", response.status, data.error?.status);
+      const detail = data.error?.message?.replaceAll(apiKey, "[chave omitida]").replace(/\s+/g, " ").slice(0, 400);
+      const error = new ProviderApiError("Gemini", response.status, data.error?.status, detail);
       if (attempt < modelsToTry.length - 1 && response.status === 404) continue;
       throw error;
     }
@@ -110,7 +118,10 @@ export async function searchWithTavily(query: string, signal?: AbortSignal) {
     signal: signal ?? AbortSignal.timeout(20_000),
   });
   const data = await response.json() as TavilyResponse;
-  if (!response.ok) throw new ProviderApiError("Tavily", response.status);
+  if (!response.ok) {
+    const detail = (data.detail ?? data.message ?? data.error)?.replaceAll(apiKey, "[chave omitida]").replace(/\s+/g, " ").slice(0, 400);
+    throw new ProviderApiError("Tavily", response.status, undefined, detail);
+  }
 
   return (data.results ?? [])
     .filter((result): result is { title: string; url: string; content: string } => Boolean(result.title && result.url && result.content))
