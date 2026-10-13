@@ -61,7 +61,7 @@ export function approveProjectVersion(project: Project, versionId: string, at: s
 export const demoProjects: Project[] = [
   {
     id: "demo-1", title: "Por que os aviões deixam rastros no céu?", category: "Ciência & aviação", format: "Reels", audience: "Curiosos por aviação",
-    status: "research_review", updatedAt: "Hoje, 10:42", researchSummary: "Projeto de demonstração. Esta ficha é fictícia e não representa pesquisa de fontes reais. Pesquise uma pauta com sua chave da OpenAI para reunir evidências verificáveis.",
+    status: "research_review", updatedAt: "Hoje, 10:42", researchSummary: "Projeto de demonstração. Esta ficha é fictícia e não representa pesquisa de fontes reais. Pesquise uma pauta com Gemini e Tavily para reunir evidências verificáveis.",
     verifiedPoints: ["Nenhuma evidência foi verificada neste projeto de demonstração."], divergences: [], gaps: ["Adicionar pesquisa com fontes antes de aprovar."], sources: [], versions: [], events: [{ label: "Projeto fictício de demonstração criado", at: "Hoje, 10:42" }],
   },
   {

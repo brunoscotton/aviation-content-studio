@@ -6,9 +6,9 @@ MVP privado para pesquisa editorial e produção de roteiros aeronáuticos em po
 
 - Dashboard responsivo, biblioteca, estados do workflow e preferências editoriais.
 - Componentes de interface com Tailwind CSS e base shadcn/ui (`components/ui/button.tsx`).
-- Modo demo local sem chamadas externas. Projetos e roteiros de exemplo são fictícios e identificados como demonstração. O botão de pesquisa não cria resultados fictícios; sem `OPENAI_API_KEY`, a rota explica a configuração ausente.
+- Modo demo local sem chamadas externas. Projetos e roteiros de exemplo são fictícios e identificados como demonstração. O botão de pesquisa não cria resultados fictícios; sem as chaves Gemini e Tavily, a rota explica a configuração ausente.
 - Supabase Auth por e-mail/senha e sincronização de projetos com PostgreSQL quando as variáveis Supabase estão definidas.
-- Pesquisa atual via OpenAI Responses API com `web_search`, filtro de domínios prioritários, títulos/URLs citados, data de consulta e revisão humana.
+- Pesquisa web via Tavily nos domínios governamentais e dos fabricantes prioritários, analisada pelo Gemini, com títulos/URLs, data de consulta e revisão humana.
 - Roteiros estruturados, edição manual/conversacional, exportação Markdown/TXT, versões, comparação, restauração e aprovação explícita.
 - Migração SQL com sete tabelas, RLS por proprietário, índices, auditoria de eventos, transições controladas e proteção de roteiro aprovado.
 - Schemas Zod, limite simples de uso em memória, idempotência por chave, timeout e no máximo uma repetição do SDK por chamada.
@@ -17,7 +17,7 @@ MVP privado para pesquisa editorial e produção de roteiros aeronáuticos em po
 
 - Node.js 20.9+ (a versão atual do Next instalada pode exigir uma versão LTS recente).
 - npm.
-- Para pesquisar e gerar roteiros com acesso privado: uma chave de API OpenAI e um projeto Supabase configurado.
+- Para pesquisar e gerar roteiros com acesso privado: uma chave Gemini, uma chave Tavily e um projeto Supabase configurado.
 - Não é preciso executar migration remota para experimentar o modo demo.
 
 ## Executar localmente
@@ -28,7 +28,7 @@ Copy-Item .env.example .env.local
 npm run dev
 ```
 
-Abra `http://localhost:3000`. Sem variáveis Supabase, a aplicação usa o workspace de demonstração local. As rotas de pesquisa e geração permanecem desabilitadas sem Supabase Auth, mesmo se existir uma chave OpenAI, para impedir que um workspace público consuma a chave. Com Supabase Auth e migration configurados, defina `OPENAI_API_KEY` apenas no `.env.local` do servidor para habilitar pesquisa e geração. A chave nunca usa prefixo `NEXT_PUBLIC_`.
+Abra `http://localhost:3000`. Sem variáveis Supabase, a aplicação usa o workspace de demonstração local. As rotas de pesquisa e geração permanecem desabilitadas sem Supabase Auth, mesmo se as chaves de IA existirem, para impedir que um workspace público consuma as cotas. Com Supabase Auth e migration configurados, defina `GEMINI_API_KEY` e `TAVILY_API_KEY` apenas no `.env.local` do servidor. Chaves privadas nunca usam prefixo `NEXT_PUBLIC_`.
 
 ## Supabase
 
@@ -39,9 +39,9 @@ Abra `http://localhost:3000`. Sem variáveis Supabase, a aplicação usa o works
 
 Nunca configure `service_role` no navegador ou neste MVP. O cliente Supabase usa a chave anon/public, com RLS como controle de acesso.
 
-## OpenAI
+## Gemini e pesquisa web
 
-Defina `OPENAI_API_KEY` no ambiente servidor. Opcionalmente, configure `OPENAI_MODEL`; o padrão é `gpt-6-astra`. A pesquisa usa Responses + `web_search` com fontes governamentais e fabricantes. Fontes citadas aparecem como links e são enviadas ao editor como dados não confiáveis. O código não busca conteúdo com scraper próprio nem publica em redes.
+Defina `GEMINI_API_KEY` e `TAVILY_API_KEY` no ambiente servidor. `GEMINI_MODEL` é opcional e usa `gemini-2.5-flash` por padrão. A busca web usa Tavily Basic (cota gratuita anunciada de 1.000 créditos/mês, sem cartão); uma pesquisa básica consome crédito conforme o plano Tavily. O Gemini analisa somente os trechos e URLs retornados pela busca, que são tratados como dados não confiáveis. Fontes aparecem como links e seguem para a revisão humana. O código não publica em redes.
 
 O limite de chamadas e a idempotência atuais são mantidos em memória do processo: são proteções básicas para desenvolvimento, não cotas duráveis entre réplicas/restarts. Adote armazenamento de uso/idempotência no banco antes de operar em escala. Custos dependem de modelo, tokens e chamadas de busca.
 
@@ -61,19 +61,20 @@ Para Playwright, se o navegador ainda não estiver instalado: `npx playwright in
 
 ## Deploy Vercel
 
-1. Configure no painel Vercel as variáveis públicas do Supabase (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`) e as variáveis privadas `OPENAI_API_KEY` e `OPENAI_MODEL`. Marque `Production` para o domínio principal. Depois de editar variáveis, faça um novo deploy: elas não alteram implantações já criadas.
-2. Aplique a migration ao banco Supabase por um processo revisado e autorizado. O app não executa migrations remotas automaticamente.
-3. Execute lint, typecheck, testes e build; configure a URL de redirect de autenticação no Supabase.
-4. Faça o deploy pelo fluxo do seu projeto. Este repositório não cria recursos pagos nem executa deploy.
+1. Configure no painel Vercel as variáveis públicas do Supabase (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`) e as variáveis privadas `GEMINI_API_KEY`, `GEMINI_MODEL` (`gemini-2.5-flash`) e `TAVILY_API_KEY`. Marque `Production` e, se aplicável, `Preview`/`Development`. Não use o prefixo `NEXT_PUBLIC_` nas chaves de IA.
+2. Aplique a migration `supabase/migrations/202610120001_initial_schema.sql` no projeto Supabase pelo SQL Editor. O app não executa migrations remotas automaticamente.
+3. Em Supabase Authentication, crie o usuário. Em Authentication > URL Configuration, configure o domínio Vercel como Site URL e inclua a URL de callback indicada no fluxo de autenticação em Redirect URLs.
+4. Depois de salvar variáveis no painel Vercel, publique um novo deploy. Variáveis novas não alteram implantações já criadas.
+5. Entre com o usuário Supabase, pesquise uma pauta e depois gere o roteiro usando a pesquisa aprovada. O painel indica se as variáveis chegaram à aplicação, sem exibir seus valores.
 
-Se o cartão do dashboard indicar que `OPENAI_API_KEY` não chegou ao servidor, confirme o nome exato da variável, o ambiente `Production` (para o domínio principal) e faça um novo deploy após salvar. Se indicar `Presente` e uma chamada falhar, a resposta agora diferencia chave rejeitada (401), falta de permissão/modelo (403/404) e limite ou créditos (429). A chave não deve começar com `NEXT_PUBLIC_`.
+Se o painel indicar que as chaves de IA estão ausentes, confira os nomes exatos, os ambientes Vercel e faça um novo deploy. Gemini e Tavily retornam mensagens diferentes para chave inválida (401/403), modelo inexistente (404) e cota excedida (429). As chaves devem permanecer privadas.
 
 ## Limitações conhecidas
 
 - O editor salva em Supabase no modo autenticado e no localStorage no modo demo; o envio do estado completo do projeto usa uma rota de sincronização simples, sem transação multi-tabela. Operação concorrente e colaboração multiusuário não são suportadas.
 - O MVP não tem comparação de diff palavra a palavra, convite de equipe, orçamento monetário durável, compartilhamento, publicação ou geração de imagem.
 - Os limites de uso em memória não substituem monitoramento financeiro nem controle por organização.
-- Fontes são rastreáveis a partir das citações retornadas pela Responses API. Data de publicação só aparece quando a fonte fornece essa informação; a data de consulta é sempre registrada.
+- Fontes e trechos de apoio vêm dos resultados do Tavily. Data de publicação só aparece quando a fonte fornece essa informação; a data de consulta é sempre registrada.
 - A aprovação de pesquisa e roteiro é uma ação humana na interface. Revise alegações técnicas nas fontes oficiais antes de publicar.
 
 ## Verificação
