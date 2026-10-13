@@ -44,6 +44,12 @@ export async function PUT(request: Request) {
   const supabase = await createClient();
   for (const project of parsed.data.projects) {
     const { data: existing } = await supabase.from("content_projects").select("workflow_status").eq("id", project.id).maybeSingle();
+    // A research run starts from an idea but completes directly in review. Walk
+    // through the database's allowed "researching" state before saving review.
+    if (existing?.workflow_status === "idea" && project.status === "research_review") {
+      const { error: startResearchError } = await supabase.from("content_projects").update({ workflow_status: "researching" }).eq("id", project.id);
+      if (startResearchError) return NextResponse.json({ error: "Não foi possível iniciar a pesquisa deste projeto." }, { status: 400 });
+    }
     if (existing?.workflow_status === "approved" && project.status === "script_review") {
       const { error: reopenError } = await supabase.from("content_projects").update({ workflow_status: "drafting" }).eq("id", project.id);
       if (reopenError) return NextResponse.json({ error: "Não foi possível reabrir o roteiro aprovado para revisão." }, { status: 400 });

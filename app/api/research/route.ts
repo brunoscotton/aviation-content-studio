@@ -4,6 +4,8 @@ import { authorizeRequest } from "@/lib/server/auth";
 import { aiConfigurationError, generateWithGemini, getGeminiApiKey, getTavilyApiKey, ProviderApiError, providerRequestError, searchWithTavily } from "@/lib/server/ai";
 import { checkUsage, isDuplicate } from "@/lib/server/usage";
 
+export const maxDuration = 90;
+
 export async function POST(request: Request) {
   const auth = await authorizeRequest();
   if (!auth.ok) return NextResponse.json({ error: "Faça login para pesquisar pautas." }, { status: 401 });
@@ -34,9 +36,10 @@ export async function POST(request: Request) {
     const gaps = block("LACUNAS").split(/\n+/).map((v) => v.replace(/^[-*•\d.)\s]+/, "").trim()).filter(Boolean);
     return NextResponse.json({ summary, sources: sources.map(({ title, url }) => ({ title, url })), verifiedPoints, divergences, gaps, accessedAt: new Date().toISOString() });
   } catch (error) {
-    console.error("research_request_failed", error instanceof Error ? error.name : "unknown");
+    console.error("research_request_failed", error instanceof ProviderApiError ? { provider: error.provider, status: error.status, code: error.code } : error instanceof Error ? error.name : "unknown");
     const timeout = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
     const providerStatus = error instanceof ProviderApiError && error.status >= 400 && error.status < 500 ? error.status : null;
-    return NextResponse.json({ error: providerRequestError("Pesquisa", error) }, { status: timeout ? 504 : providerStatus ?? 502 });
+    const providerTimeout = error instanceof ProviderApiError && error.status === 504;
+    return NextResponse.json({ error: providerRequestError("Pesquisa", error) }, { status: timeout || providerTimeout ? 504 : providerStatus ?? 502 });
   }
 }

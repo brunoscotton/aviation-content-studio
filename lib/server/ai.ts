@@ -49,6 +49,11 @@ export function providerRequestError(feature: "Pesquisa" | "Geração", error: u
         ? `${feature} bloqueada pelo limite gratuito da API Gemini. Aguarde a renovação do limite e confira as quotas do projeto Google AI Studio.`
         : `${feature} bloqueada porque o limite gratuito mensal do Tavily foi atingido. Aguarde a renovação dos créditos ou confira o painel Tavily.`;
     }
+    if (error.status === 504 && error.code === "TIMEOUT") {
+      return error.provider === "Gemini"
+        ? `${feature}: o Gemini demorou mais que o limite desta tentativa. A pesquisa encontrou fontes; a etapa de análise por IA expirou. Tente novamente em instantes.`
+        : `${feature}: a busca web do Tavily demorou mais que o limite desta tentativa. Tente novamente em instantes.`;
+    }
     return `${feature}: ${error.provider} recusou a solicitação (HTTP ${error.status}). Confira os limites e as configurações da API.`;
   }
   if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
@@ -72,16 +77,22 @@ export async function generateWithGemini(
 
   for (let attempt = 0; attempt < modelsToTry.length; attempt += 1) {
     const selectedModel = modelsToTry[attempt];
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(selectedModel)}:generateContent`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        system_instruction: options.systemInstruction ? { parts: [{ text: options.systemInstruction }] } : undefined,
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: options.json ? { responseMimeType: "application/json" } : undefined,
-      }),
-      signal: options.signal ?? AbortSignal.timeout(50_000),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(selectedModel)}:generateContent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify({
+          system_instruction: options.systemInstruction ? { parts: [{ text: options.systemInstruction }] } : undefined,
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: options.json ? { responseMimeType: "application/json" } : undefined,
+        }),
+        signal: options.signal ?? AbortSignal.timeout(35_000),
+      });
+    } catch (error) {
+      if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) throw new ProviderApiError("Gemini", 504, "TIMEOUT");
+      throw error;
+    }
 
     const data = await response.json() as GeminiResponse;
     if (!response.ok) {
@@ -102,21 +113,27 @@ export async function searchWithTavily(query: string, signal?: AbortSignal) {
   const apiKey = getTavilyApiKey();
   if (!apiKey) throw new Error("TAVILY_API_KEY is not configured");
 
-  const response = await fetch("https://api.tavily.com/search", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      api_key: apiKey,
-      query,
-      topic: "general",
-      search_depth: "basic",
-      max_results: 8,
-      include_raw_content: false,
-      include_answer: false,
-      include_domains: ["gov.br", "anac.gov.br", "decea.mil.br", "faa.gov", "easa.europa.eu", "boeing.com", "airbus.com", "embraer.com"],
-    }),
-    signal: signal ?? AbortSignal.timeout(20_000),
-  });
+  let response: Response;
+  try {
+    response = await fetch("https://api.tavily.com/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        api_key: apiKey,
+        query,
+        topic: "general",
+        search_depth: "basic",
+        max_results: 6,
+        include_raw_content: false,
+        include_answer: false,
+        include_domains: ["gov.br", "anac.gov.br", "decea.mil.br", "faa.gov", "easa.europa.eu", "boeing.com", "airbus.com", "embraer.com"],
+      }),
+      signal: signal ?? AbortSignal.timeout(18_000),
+    });
+  } catch (error) {
+    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) throw new ProviderApiError("Tavily", 504, "TIMEOUT");
+    throw error;
+  }
   const data = await response.json() as TavilyResponse;
   if (!response.ok) {
     const detail = (data.detail ?? data.message ?? data.error)?.replaceAll(apiKey, "[chave omitida]").replace(/\s+/g, " ").slice(0, 400);
